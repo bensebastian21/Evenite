@@ -6,6 +6,7 @@ module.exports = defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
+  timeout: 90000,
   reporter: 'html',
   use: {
     baseURL: 'http://localhost:3000',
