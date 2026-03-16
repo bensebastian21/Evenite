@@ -59,6 +59,8 @@ node_modules/
 __pycache__/
 *.log
 *.pyc
+*.db
+ai_service/uploads/
 
 .cache/
 node_modules/.cache/
