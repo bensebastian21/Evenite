@@ -942,7 +942,7 @@ router.get("/google/callback", async (req, res) => {
     const token = jwt.sign(
       { id: user._id, email: user.email, role: user.role },
       process.env.JWT_SECRET || 'default-jwt-secret-for-development',
-      { expiresIn: "1h" }
+      { expiresIn: "7d" }
     );
 
     const userPayload = {
@@ -1325,7 +1325,7 @@ router.post("/login", async (req, res) => {
     const token = jwt.sign(
       { id: user._id, email: user.email, role: user.role },
       process.env.JWT_SECRET || 'default-jwt-secret-for-development',
-      { expiresIn: "1h" }
+      { expiresIn: "7d" }
     );
 
     res.json({
@@ -1375,7 +1375,7 @@ router.post("/login-host", async (req, res) => {
     const token = jwt.sign(
       { id: host._id, email: host.email, role: "host" },
       process.env.JWT_SECRET || 'default-jwt-secret-for-development',
-      { expiresIn: "1h" }
+      { expiresIn: "7d" }
     );
 
     res.json({
@@ -1463,7 +1463,7 @@ router.post("/google-login", async (req, res) => {
     const token = jwt.sign(
       { id: user._id, email: user.email, role: user.role },
       process.env.JWT_SECRET || 'default-jwt-secret-for-development',
-      { expiresIn: "1h" }
+      { expiresIn: "7d" }
     );
 
     res.json({

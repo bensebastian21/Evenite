@@ -65,7 +65,8 @@ import CertificateEditor from '../components/CertificateEditor';
 import AiFeedbackDashboard from '../components/AiFeedbackDashboard';
 import GenLoopStudio from '../components/host/GenLoopStudio';
 import MarketingCopywriter from '../components/host/MarketingCopywriter';
-import { EVENT_THEMES } from '../components/GamifiedComponents';
+import { EVENT_THEMES, GamifiedEventCard } from '../components/GamifiedComponents';
+import EventDetailModal from '../components/EventDetailModal';
 // Charts
 import {
   ResponsiveContainer,
@@ -400,6 +401,7 @@ export default function HostDashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [discoverSearch, setDiscoverSearch] = useState('');
+  const [selectedDiscoverEvent, setSelectedDiscoverEvent] = useState(null);
   const [lightbox, setLightbox] = useState({ open: false, images: [], index: 0 });
   // Registrations UI state
   const [regSearch, setRegSearch] = useState('');
@@ -1050,11 +1052,12 @@ export default function HostDashboard() {
         return /^\d{6}$/.test(value) ? '' : 'Pincode must be 6 digits';
       case 'capacity':
         const cap = parseInt(value);
-        return cap >= 0 ? '' : 'Capacity must be 0 or greater';
+        return cap >= 10 && cap <= 10000 ? '' : 'Capacity must be between 10 and 10,000';
       case 'price':
+        if (value === '' || value === null || value === undefined) return '';
         const price = parseFloat(value);
         if (isNaN(price)) return 'Invalid price';
-        if (price < 0) return 'Price must be 0 or greater';
+        if (price < 0) return 'Price cannot be negative';
         if (price > 50000) return 'Price cannot exceed 50,000';
         return '';
       case 'website':
@@ -1077,6 +1080,10 @@ export default function HostDashboard() {
         if (!value) return '';
         const lng = parseFloat(value);
         return !isNaN(lng) && lng >= -180 && lng <= 180 ? '' : 'Invalid longitude';
+      case 'contactEmail':
+        return /\S+@\S+\.\S+/.test(value) ? '' : 'Invalid email format';
+      case 'contactPhone':
+        return /^\d{10}$/.test(value) ? '' : 'Phone must be 10 digits';
       default:
         return '';
     }
@@ -1174,18 +1181,22 @@ export default function HostDashboard() {
     let nextValue = value;
     if (field === 'capacity') {
       const num = parseInt(String(value).replace(/[^\d-]/g, ''), 10);
-      nextValue = isNaN(num) || num < 0 ? 0 : num;
+      nextValue = isNaN(num) || num < 10 ? 10 : num > 10000 ? 10000 : num;
     }
     if (field === 'price') {
       const cleaned = String(value).replace(/[^\d.]/g, '');
-      let num = parseFloat(cleaned);
-      if (isNaN(num) || num < 0) {
-        nextValue = 0;
-      } else if (num > 50000) {
-        nextValue = 50000;
-        toast.warning('Price capped at 50,000');
+      if (cleaned === '') {
+        nextValue = '';
       } else {
-        nextValue = parseFloat(num.toFixed(2));
+        let num = parseFloat(cleaned);
+        if (isNaN(num) || num < 0) {
+          nextValue = 0;
+        } else if (num > 50000) {
+          nextValue = 50000;
+          toast.warning('Price capped at 50,000');
+        } else {
+          nextValue = parseFloat(num.toFixed(2));
+        }
       }
     }
     if (field === 'pincode') {
@@ -3509,112 +3520,18 @@ export default function HostDashboard() {
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                         {filteredDiscoverEvents.map((ev) => (
-                          <div
+                          <GamifiedEventCard
                             key={ev._id}
-                            className="bg-white border-2 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] hover:shadow-[16px_16px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[-8px] hover:translate-y-[-8px] transition-all duration-300 flex flex-col group overflow-hidden"
-                          >
-                            {/* Event Image */}
-                            <div className="relative h-48 bg-neutral-100 border-b-2 border-black overflow-hidden">
-                              {ev.imageUrl ? (
-                                <img
-                                  src={toAbsoluteUrl(ev.imageUrl)}
-                                  alt={ev.title}
-                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 group-hover:grayscale"
-                                />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center bg-neutral-100 relative overflow-hidden">
-                                  <div
-                                    className="absolute inset-0 opacity-10"
-                                    style={{
-                                      backgroundImage:
-                                        'radial-gradient(circle at 1px 1px, black 1px, transparent 0)',
-                                      backgroundSize: '10px 10px',
-                                    }}
-                                  ></div>
-                                  <Calendar className="w-16 h-16 text-neutral-400" />
-                                </div>
-                              )}
-                              {ev.isOnline && (
-                                <span className="absolute top-3 right-3 px-3 py-1 bg-blue-400 border-2 border-black text-black text-xs font-bold uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-                                  Online
-                                </span>
-                              )}
-                              {ev.category && (
-                                <span className="absolute top-3 left-3 px-3 py-1 bg-white border-2 border-black text-black text-xs font-bold uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-                                  {ev.category}
-                                </span>
-                              )}
-                            </div>
-
-                            {/* Event Info */}
-                            <div className="p-6 flex-1 flex flex-col">
-                              <h4 className="font-black text-black text-lg mb-2 line-clamp-2 uppercase leading-tight group-hover:underline decoration-2 underline-offset-2">
-                                {ev.title}
-                              </h4>
-                              <p className="text-sm text-slate-600 mb-6 line-clamp-2 font-medium">
-                                {ev.shortDescription ||
-                                  ev.description ||
-                                  'No description available'}
-                              </p>
-
-                              <div className="space-y-3 mb-6 font-mono text-xs font-medium">
-                                <div className="flex items-center gap-3 text-slate-700">
-                                  <Calendar className="w-4 h-4 text-black" />
-                                  <span className="uppercase">
-                                    {new Date(ev.date).toLocaleDateString()}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-3 text-slate-700">
-                                  <MapPin className="w-4 h-4 text-black" />
-                                  <span className="line-clamp-1 uppercase">
-                                    {ev.location || 'TBA'}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-3 text-slate-700">
-                                  <Users className="w-4 h-4 text-black" />
-                                  <span className="font-bold uppercase">
-                                    {ev.hostId?.fullname || ev.hostId?.email || 'Unknown Host'}
-                                  </span>
-                                </div>
-                              </div>
-
-                              {Array.isArray(ev.tags) && ev.tags.length > 0 && (
-                                <div className="flex gap-2 flex-wrap mb-6">
-                                  {ev.tags.slice(0, 4).map((t, i) => (
-                                    <span
-                                      key={i}
-                                      className="px-2 py-0.5 border-2 border-black bg-neutral-100 text-black text-xs font-bold uppercase"
-                                    >
-                                      {t}
-                                    </span>
-                                  ))}
-                                  {ev.tags.length > 4 && (
-                                    <span className="px-2 py-0.5 border-2 border-black bg-white text-black text-xs font-bold uppercase">
-                                      +{ev.tags.length - 4}
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-
-                              <div className="mt-auto flex items-center justify-between pt-4 border-t-2 border-dashed border-black/20">
-                                <div className="text-xs font-bold uppercase text-slate-600">
-                                  <span className="text-black">
-                                    {ev.registrations?.length || 0}
-                                  </span>{' '}
-                                  registered
-                                </div>
-                                {ev.price > 0 ? (
-                                  <span className="text-xs font-black uppercase text-green-700">
-                                    {ev.currency} {ev.price}
-                                  </span>
-                                ) : (
-                                  <span className="text-xs font-black uppercase text-green-700">
-                                    Free
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
+                            event={ev}
+                            onViewMore={() => setSelectedDiscoverEvent(ev)}
+                            onRegister={() => {}}
+                            onBookmark={() => {}}
+                            isRegistered={false}
+                            isBookmarked={false}
+                            disabledActions={true}
+                            hideActions={true}
+                            analyticsSource="host_discover"
+                          />
                         ))}
                       </div>
                     )}
@@ -4890,6 +4807,32 @@ export default function HostDashboard() {
             onScanFailure={(err) => console.log(err)}
             onClose={() => setShowScanner(false)}
           />
+        )}
+        {selectedDiscoverEvent && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <EventDetailModal
+              event={selectedDiscoverEvent}
+              isOpen={!!selectedDiscoverEvent}
+              onClose={() => setSelectedDiscoverEvent(null)}
+              user={user}
+              onRegister={() => {}}
+              onBookmark={() => {}}
+              onSubscribe={() => {}}
+              onNavigateToReview={() => {}}
+              onDownloadCertificate={() => {}}
+              isRegistered={() => false}
+              isWaitlisted={() => false}
+              isBookmarked={() => false}
+              isSubscribed={false}
+              onOpenHost={() => {}}
+              onJoinWaitingList={() => {}}
+              onCancel={() => {}}
+              disabledActions={true}
+              hideRegister={true}
+              hideHostCard={true}
+              hideSecondaryActions={true}
+            />
+          </div>
         )}
       </div>
     </LayoutGroup>

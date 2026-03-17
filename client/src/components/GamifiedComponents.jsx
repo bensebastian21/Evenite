@@ -262,6 +262,7 @@ export const GamifiedEventCard = ({
   awardPoints,
   disabledActions = false,
   analyticsSource = 'dashboard',
+  hideActions = false,
 }) => {
   const cardRef = React.useRef(null);
   const hasLoggedImpressionRef = React.useRef(false);
@@ -481,7 +482,7 @@ export const GamifiedEventCard = ({
         </div>
 
         {/* Actions (Buttons) */}
-        <div className="flex gap-2 relative z-10">
+        {!hideActions && <div className="flex gap-2 relative z-10">
           {isRegistered && !isCompleted && (
             <button
               onClick={(e) => {
@@ -524,7 +525,7 @@ export const GamifiedEventCard = ({
           >
             <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-current' : ''}`} />
           </button>
-        </div>
+        </div>}
       </div>
       <TicketModal isOpen={showTicket} onClose={() => setShowTicket(false)} eventId={event._id} />
     </motion.div>

@@ -109,6 +109,30 @@ export default function AdminPanel() {
     title: '',
     message: '',
   });
+  const [notificationErrors, setNotificationErrors] = useState({});
+  const [notificationTouched, setNotificationTouched] = useState({});
+
+  const validateNotificationField = (field, value) => {
+    switch (field) {
+      case 'title': return value.trim().length >= 3 ? '' : 'Title must be at least 3 characters';
+      case 'message': return value.trim().length >= 10 ? '' : 'Message must be at least 10 characters';
+      default: return '';
+    }
+  };
+
+  const handleNotificationFocus = (field) => {
+    setNotificationTouched(prev => ({ ...prev, [field]: true }));
+    const err = validateNotificationField(field, notificationForm[field] || '');
+    setNotificationErrors(prev => ({ ...prev, [field]: err }));
+  };
+
+  const handleNotificationChange = (field, value) => {
+    setNotificationForm(prev => ({ ...prev, [field]: value }));
+    if (notificationTouched[field]) {
+      const err = validateNotificationField(field, value);
+      setNotificationErrors(prev => ({ ...prev, [field]: err }));
+    }
+  };
   const [sendingNotification, setSendingNotification] = useState(false);
   const navigate = useNavigate();
 
@@ -123,7 +147,7 @@ export default function AdminPanel() {
   const [financialStats, setFinancialStats] = useState(null);
   const [ledger, setLedger] = useState([]);
   const [loadingFinancials, setLoadingFinancials] = useState(false);
-  const [payoutForm, setPayoutForm] = useState({ hostId: '', amount: '', note: '' });
+  const [paymentForm, setPaymentForm] = useState({ hostId: '', hostEmail: '', amount: '', note: '' });
   const [hostSearchQuery, setHostSearchQuery] = useState('');
   const [showHostDropdown, setShowHostDropdown] = useState(false);
   const [hostSummaries, setHostSummaries] = useState([]);
@@ -240,43 +264,6 @@ export default function AdminPanel() {
     setEventTouchedFields((prev) => ({ ...prev, [field]: true }));
     const error = validateAdminEventField(field, eventForm[field]);
     setEventFormErrors((prev) => ({ ...prev, [field]: error }));
-  };
-
-  const openAdminEventCreate = () => {
-    setEditingEvent(null);
-    setEventForm({
-      title: '',
-      description: '',
-      shortDescription: '',
-      date: '',
-      endDate: '',
-      registrationDeadline: '',
-      location: '',
-      address: '',
-      city: '',
-      state: '',
-      pincode: '',
-      capacity: 0,
-      price: 0,
-      currency: 'INR',
-      category: 'General',
-      tags: '',
-      requirements: '',
-      agenda: '',
-      contactEmail: '',
-      contactPhone: '',
-      countryCode: '+91',
-      website: '',
-      imageUrl: '',
-      isOnline: false,
-      meetingLink: '',
-      platform: 'Google Meet',
-      latitude: '',
-      longitude: '',
-    });
-    setEventFormErrors({});
-    setEventTouchedFields({});
-    setShowEventForm(true);
   };
 
   const openAdminEventEdit = (event) => {
@@ -741,30 +728,30 @@ export default function AdminPanel() {
     }
   };
 
-  const recordPayout = async (e) => {
+  const recordPayment = async (e) => {
     e.preventDefault();
-    if (!payoutForm.hostId) {
+    if (!paymentForm.hostId) {
       toast.error('Please select a host from the search results');
       return;
     }
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${config.apiBaseUrl}/api/auth/admin/financials/payout/${payoutForm.hostId}`, {
+      const response = await fetch(`${config.apiBaseUrl}/api/auth/admin/financials/payout/${paymentForm.hostId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ amount: Number(payoutForm.amount), note: payoutForm.note })
+        body: JSON.stringify({ amount: Number(paymentForm.amount), note: paymentForm.note })
       });
 
-      if (!response.ok) throw new Error('Payout failed');
-      toast.success('Payout recorded successfully');
-      setPayoutForm({ hostId: '', amount: '', note: '' });
+      if (!response.ok) throw new Error('Payment recording failed');
+      toast.success('Payment recorded successfully');
+      setPaymentForm({ hostId: '', hostEmail: '', amount: '', note: '' });
       setHostSearchQuery('');
       fetchFinancials();
     } catch (error) {
-      toast.error('Error recording payout');
+      toast.error('Error recording payment');
     }
   };
 
@@ -790,6 +777,13 @@ export default function AdminPanel() {
       const res = await fetch(`${config.apiBaseUrl}/api/auth/admin/metrics`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      if (res.status === 401 || res.status === 403) {
+        toast.error('Session expired. Please log in again.');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        navigate('/', { replace: true });
+        return;
+      }
       if (!res.ok) throw new Error('Failed to fetch metrics');
       setMetrics(await res.json());
     } catch (e) {
@@ -1107,6 +1101,8 @@ export default function AdminPanel() {
       const data = await res.json();
       toast.success(data.message || 'Notification sent');
       setNotificationForm({ targetAudience: 'students', type: 'System', title: '', message: '' });
+      setNotificationErrors({});
+      setNotificationTouched({});
     } catch (e) {
       toast.error(e.message || 'Error sending notification');
     } finally {
@@ -1755,7 +1751,7 @@ export default function AdminPanel() {
                     { label: 'Gross Volume', value: `₹${financialStats?.revenue?.totalVolume?.toLocaleString() || 0}`, icon: IndianRupee, color: 'text-green-600', bg: 'bg-green-100' },
                     { label: 'Platform Fees', value: `₹${financialStats?.revenue?.totalFees?.toLocaleString() || 0}`, icon: Landmark, color: 'text-blue-600', bg: 'bg-blue-100' },
                     { label: 'Gross Earnings', value: `₹${financialStats?.revenue?.totalHostEarnings?.toLocaleString() || 0}`, icon: LayoutDashboard, color: 'text-purple-600', bg: 'bg-purple-100' },
-                    { label: 'Total Payouts', value: `₹${financialStats?.payouts?.totalPaid?.toLocaleString() || 0}`, icon: Banknote, color: 'text-orange-600', bg: 'bg-orange-100' },
+                    { label: 'Balance Owed', value: `₹${hostSummaries.reduce((sum, s) => sum + (s.remainingBalance || 0), 0).toLocaleString()}`, icon: Banknote, color: 'text-orange-600', bg: 'bg-orange-100' },
                   ].map((stat, i) => (
                     <div key={i} className="bg-white border-2 border-black p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] flex items-center gap-4">
                       <div className={`p-4 border-2 border-black ${stat.bg.replace('bg-', 'bg-')}`}>
@@ -1799,7 +1795,7 @@ export default function AdminPanel() {
                           {ledger.length === 0 ? (
                             <tr><td colSpan="6" className="px-6 py-12 text-center text-neutral-400 font-bold uppercase italic">No financial data available</td></tr>
                           ) : (
-                            ledger.map((tx) => (
+                            ledger.filter(tx => tx.amount > 0).map((tx) => (
                               <tr key={tx._id} className="hover:bg-neutral-50 transition-colors">
                                 <td className="px-6 py-4 font-mono text-xs font-bold">{new Date(tx.createdAt).toLocaleDateString()}</td>
                                 <td className="px-6 py-4">
@@ -1807,7 +1803,7 @@ export default function AdminPanel() {
                                   <p className="text-[10px] font-bold text-neutral-500 uppercase">{tx.hostId?.fullname}</p>
                                 </td>
                                 <td className="px-6 py-4">
-                                  <span className={`px-2 py-0.5 border-2 border-black text-[10px] font-black uppercase ${tx.type === 'TicketSale' ? 'bg-green-400' : tx.type === 'Payout' ? 'bg-orange-400' : 'bg-red-400'
+                                  <span className={`px-2 py-0.5 border-2 border-black text-[10px] font-black uppercase ${tx.type === 'TicketSale' ? 'bg-green-400' : tx.type === 'Payment' ? 'bg-orange-400' : 'bg-red-400'
                                     }`}>
                                     {tx.type}
                                   </span>
@@ -1854,10 +1850,10 @@ export default function AdminPanel() {
                           </tr>
                         </thead>
                         <tbody className="divide-y-2 divide-black/10">
-                          {hostSummaries.length === 0 ? (
+                          {hostSummaries.filter(s => s.totalEarned > 0).length === 0 ? (
                             <tr><td colSpan="5" className="px-6 py-12 text-center text-neutral-400 font-bold uppercase italic">No host data available</td></tr>
                           ) : (
-                            hostSummaries.map((s) => (
+                            hostSummaries.filter(s => s.totalEarned > 0).map((s) => (
                               <tr key={s._id} className="hover:bg-neutral-50 transition-colors">
                                 <td className="px-6 py-4">
                                   <p className="font-black uppercase text-sm">{s.fullname}</p>
@@ -1887,125 +1883,138 @@ export default function AdminPanel() {
                     </div>
                   </div>
 
-                  {/* Payout Action Panel */}
+                  {/* Record Payment Panel */}
                   <div className="bg-white border-4 border-black p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] h-fit sticky top-24">
                     <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-2 mb-6 pb-2 border-b-2 border-black">
-                      <Banknote size={24} /> Trigger Payout
+                      <Banknote size={24} /> Record Payment
                     </h3>
-                    <form onSubmit={recordPayout} className="space-y-6">
-                      <label className="text-[10px] font-black uppercase text-neutral-500 flex items-center gap-1">
-                        <User size={12} /> Target Host
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          className={`w-full px-4 py-3 border-2 border-black font-bold outline-none focus:ring-4 focus:ring-indigo-100 transition-all ${payoutForm.hostId ? 'bg-green-50' : 'bg-neutral-50 focus:bg-white'}`}
-                          placeholder="Search host by name or email..."
-                          value={hostSearchQuery}
-                          onChange={(e) => {
-                            setHostSearchQuery(e.target.value);
-                            setPayoutForm({ ...payoutForm, hostId: '' }); // Clear selection on new search
-                            setShowHostDropdown(true);
-                          }}
-                          onFocus={() => setShowHostDropdown(true)}
-                        />
-                        {payoutForm.hostId && (
-                          <div className="absolute right-3 top-1/2 -translate-y-1/2 bg-green-500 text-white text-[8px] font-black uppercase px-2 py-1 rounded-sm border-2 border-black flex items-center gap-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-                            <CheckCircle size={10} /> Selected
-                          </div>
-                        )}
-                        {showHostDropdown && hostSearchQuery && (
-                          <div className="absolute z-50 left-0 right-0 mt-1 bg-white border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] max-h-60 overflow-y-auto">
-                            {hosts
-                              .filter(h =>
+                    <form onSubmit={recordPayment} className="space-y-6">
+                      <div>
+                        <label className="text-[10px] font-black uppercase text-neutral-500 flex items-center gap-1 mb-2">
+                          <User size={12} /> Select Host
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            className={`w-full px-4 py-3 border-2 border-black font-bold outline-none focus:ring-4 focus:ring-indigo-100 transition-all ${paymentForm.hostId ? 'bg-green-50' : 'bg-neutral-50 focus:bg-white'}`}
+                            placeholder="Search host by name or email..."
+                            value={hostSearchQuery}
+                            onChange={(e) => {
+                              setHostSearchQuery(e.target.value);
+                              setPaymentForm({ ...paymentForm, hostId: '' });
+                              setShowHostDropdown(true);
+                            }}
+                            onFocus={() => setShowHostDropdown(true)}
+                          />
+                          {paymentForm.hostId && (
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 bg-green-500 text-white text-[8px] font-black uppercase px-2 py-1 rounded-sm border-2 border-black flex items-center gap-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                              <CheckCircle size={10} /> Selected
+                            </div>
+                          )}
+                          {showHostDropdown && hostSearchQuery && (
+                            <div className="absolute z-50 left-0 right-0 mt-1 bg-white border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] max-h-60 overflow-y-auto">
+                              {hosts
+                                .filter(h =>
+                                  h.fullname?.toLowerCase().includes(hostSearchQuery.toLowerCase()) ||
+                                  h.email?.toLowerCase().includes(hostSearchQuery.toLowerCase())
+                                )
+                                .map(h => {
+                                  const summary = hostSummaries.find(s => s.email === h.email);
+                                  const balance = summary ? summary.remainingBalance : 0;
+                                  return (
+                                    <button
+                                      key={h._id}
+                                      type="button"
+                                      onClick={() => {
+                                        const s = hostSummaries.find(x => x.email === h.email);
+                                        setPaymentForm({ ...paymentForm, hostId: s ? s._id : h._id, hostEmail: h.email });
+                                        setHostSearchQuery(h.fullname);
+                                        setShowHostDropdown(false);
+                                      }}
+                                      className="w-full text-left px-4 py-3 hover:bg-neutral-100 border-b-2 border-black last:border-b-0 flex justify-between items-center"
+                                    >
+                                      <div className="flex flex-col">
+                                        <span className="font-black text-sm uppercase">{h.fullname}</span>
+                                        <span className="text-[10px] font-bold text-neutral-500 uppercase">{h.email}</span>
+                                      </div>
+                                      {balance > 0 && (
+                                        <div className="text-right">
+                                          <span className="text-[10px] font-black bg-orange-100 text-orange-700 px-2 py-0.5 border border-orange-200 uppercase">
+                                            Owed: &#8377;{balance.toLocaleString()}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </button>
+                                  );
+                                })
+                              }
+                              {hosts.filter(h =>
                                 h.fullname?.toLowerCase().includes(hostSearchQuery.toLowerCase()) ||
                                 h.email?.toLowerCase().includes(hostSearchQuery.toLowerCase())
-                              )
-                              .map(h => {
-                                const summary = hostSummaries.find(s => s._id === h._id);
-                                const balance = summary ? summary.remainingBalance : 0;
-                                return (
-                                  <button
-                                    key={h._id}
-                                    type="button"
-                                    onClick={() => {
-                                      setPayoutForm({ ...payoutForm, hostId: h._id });
-                                      setHostSearchQuery(h.fullname);
-                                      setShowHostDropdown(false);
-                                    }}
-                                    className="w-full text-left px-4 py-3 hover:bg-neutral-100 border-b-2 border-black last:border-b-0 flex justify-between items-center"
-                                  >
-                                    <div className="flex flex-col">
-                                      <span className="font-black text-sm uppercase">{h.fullname}</span>
-                                      <span className="text-[10px] font-bold text-neutral-500 uppercase">{h.email}</span>
-                                    </div>
-                                    {balance > 0 && (
-                                      <div className="text-right">
-                                        <span className="text-[10px] font-black bg-orange-100 text-orange-700 px-2 py-0.5 border border-orange-200 uppercase">
-                                          Owed: ₹{balance.toLocaleString()}
-                                        </span>
-                                      </div>
-                                    )}
-                                  </button>
-                                );
-                              })
-                            }
-                            {hosts.filter(h =>
-                              h.fullname?.toLowerCase().includes(hostSearchQuery.toLowerCase()) ||
-                              h.email?.toLowerCase().includes(hostSearchQuery.toLowerCase())
-                            ).length === 0 && (
+                              ).length === 0 && (
                                 <div className="px-4 py-3 text-xs font-bold text-neutral-400 italic">No hosts found</div>
                               )}
-                          </div>
-                        )}
-                      </div>
-                      {payoutForm.hostId && (
-                        <div className="mt-1 flex items-center gap-2">
-                          <span className="text-[9px] font-black bg-green-100 text-green-700 px-2 py-0.5 border border-green-200">ID: {payoutForm.hostId} SELECTED</span>
+                            </div>
+                          )}
+                        </div>
+                        {paymentForm.hostId && (() => {
+                          const summary = hostSummaries.find(s => s._id === paymentForm.hostId || s.email === paymentForm.hostEmail);
+                          const balance = summary ? summary.remainingBalance : 0;
+                          return (
+                            <div className="mt-2 p-3 bg-orange-50 border-2 border-orange-300 flex justify-between items-center">
+                              <span className="text-[10px] font-black uppercase text-orange-700">Balance Owed</span>
+                              <span className="text-lg font-black text-orange-700">&#8377;{balance.toLocaleString()}</span>
+                            </div>
+                          );
+                        })()}
+                        {paymentForm.hostId && (
                           <button
                             type="button"
-                            onClick={() => {
-                              setPayoutForm({ ...payoutForm, hostId: '' });
-                              setHostSearchQuery('');
-                            }}
-                            className="text-[9px] font-black text-red-600 hover:underline uppercase"
+                            onClick={() => { setPaymentForm({ hostId: '', hostEmail: '', amount: '', note: '' }); setHostSearchQuery(''); }}
+                            className="mt-1 text-[9px] font-black text-red-600 hover:underline uppercase"
                           >
-                            Clear
+                            Clear Selection
                           </button>
-                        </div>
-                      )}
+                        )}
+                      </div>
                       <div className="space-y-2">
                         <label className="text-[10px] font-black uppercase text-neutral-500 flex items-center gap-1">
-                          <IndianRupee size={12} /> Payout Amount (₹)
+                          <IndianRupee size={12} /> Amount Paid (&#8377;)
                         </label>
                         <input
                           type="number"
                           className="w-full px-4 py-3 border-2 border-black bg-neutral-50 font-bold focus:bg-white outline-none focus:ring-4 focus:ring-indigo-100 transition-all"
                           placeholder="0.00"
-                          value={payoutForm.amount}
-                          onChange={(e) => setPayoutForm({ ...payoutForm, amount: e.target.value })}
+                          value={paymentForm.amount}
+                          onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
                           required
                         />
+                        {paymentForm.hostId && paymentForm.amount && (() => {
+                          const summary = hostSummaries.find(s => s._id === paymentForm.hostId || s.email === paymentForm.hostEmail);
+                          const balance = summary ? summary.remainingBalance : 0;
+                          const remaining = balance - Number(paymentForm.amount);
+                          return (
+                            <div className={`mt-1 p-2 border-2 text-[10px] font-black uppercase flex justify-between ${remaining < 0 ? 'bg-red-50 border-red-300 text-red-700' : 'bg-green-50 border-green-300 text-green-700'}`}>
+                              <span>Balance after payment</span>
+                              <span>&#8377;{remaining.toLocaleString()}</span>
+                            </div>
+                          );
+                        })()}
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase text-neutral-500">Transaction Note</label>
+                        <label className="text-[10px] font-black uppercase text-neutral-500">Note</label>
                         <textarea
                           className="w-full px-4 py-3 border-2 border-black bg-neutral-50 font-bold focus:bg-white outline-none focus:ring-4 focus:ring-indigo-100 transition-all resize-none"
                           rows="3"
-                          placeholder="Notes for the host..."
-                          value={payoutForm.note}
-                          onChange={(e) => setPayoutForm({ ...payoutForm, note: e.target.value })}
+                          placeholder="Payment reference or notes..."
+                          value={paymentForm.note}
+                          onChange={(e) => setPaymentForm({ ...paymentForm, note: e.target.value })}
                         />
                       </div>
                       <button className="w-full py-4 bg-black text-white text-sm font-black uppercase border-2 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,0.3)] hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all">
-                        Execute Payout Record
+                        Record Payment
                       </button>
                     </form>
-                    <div className="mt-8 p-4 bg-yellow-100 border-2 border-black">
-                      <p className="text-[10px] font-bold text-black uppercase leading-tight">
-                        Warning: This action records a ledger entry for a completed bank transfer. It does not initiate a real wire transfer.
-                      </p>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -2830,12 +2839,6 @@ export default function AdminPanel() {
                 <div className="bg-white border-2 border-black p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
                   <div className="flex justify-between items-center mb-6">
                     <h2 className="text-2xl font-black uppercase">Events List</h2>
-                    <button
-                      onClick={openAdminEventCreate}
-                      className="px-4 py-2 bg-black text-white hover:bg-neutral-800 border-2 border-black font-bold uppercase shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[-1px] hover:translate-y-[-1px] transition-all flex items-center gap-2"
-                    >
-                      <Calendar size={18} /> Create Event
-                    </button>
                   </div>
                   {loadingEvents ? (
                     <div className="text-black text-center py-12">
@@ -3880,12 +3883,7 @@ export default function AdminPanel() {
                       </label>
                       <select
                         value={notificationForm.targetAudience}
-                        onChange={(e) =>
-                          setNotificationForm({
-                            ...notificationForm,
-                            targetAudience: e.target.value,
-                          })
-                        }
+                        onChange={(e) => handleNotificationChange('targetAudience', e.target.value)}
                         className="w-full p-3 bg-white border-2 border-black focus:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all outline-none font-bold"
                         required
                       >
@@ -3900,15 +3898,14 @@ export default function AdminPanel() {
                       </label>
                       <select
                         value={notificationForm.type}
-                        onChange={(e) =>
-                          setNotificationForm({ ...notificationForm, type: e.target.value })
-                        }
+                        onChange={(e) => handleNotificationChange('type', e.target.value)}
                         className="w-full p-3 bg-white border-2 border-black focus:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all outline-none font-bold"
                         required
                       >
                         <option value="System">System Update</option>
-                        <option value="Marketing">Marketing / Newsletter</option>
-                        <option value="Alert">Important Alert</option>
+                        <option value="Event">Event Announcement</option>
+                        <option value="Reminder">Reminder</option>
+                        <option value="Achievement">Achievement</option>
                       </select>
                     </div>
                   </div>
@@ -3919,14 +3916,16 @@ export default function AdminPanel() {
                     <input
                       type="text"
                       value={notificationForm.title}
-                      onChange={(e) =>
-                        setNotificationForm({ ...notificationForm, title: e.target.value })
-                      }
+                      onFocus={() => handleNotificationFocus('title')}
+                      onChange={(e) => handleNotificationChange('title', e.target.value)}
                       placeholder="ENTER NOTIFICATION TITLE"
-                      className="w-full p-3 bg-white border-2 border-black focus:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all outline-none font-bold placeholder:text-neutral-400"
+                      className={`w-full p-3 bg-white border-2 focus:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all outline-none font-bold placeholder:text-neutral-400 ${notificationErrors.title ? 'border-red-500' : 'border-black'}`}
                       required
                       maxLength={100}
                     />
+                    {notificationTouched.title && notificationErrors.title && (
+                      <p className="mt-1 text-[10px] font-black text-red-600 uppercase">{notificationErrors.title}</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-black text-black uppercase tracking-wide mb-2">
@@ -3934,14 +3933,17 @@ export default function AdminPanel() {
                     </label>
                     <textarea
                       value={notificationForm.message}
-                      onChange={(e) =>
-                        setNotificationForm({ ...notificationForm, message: e.target.value })
-                      }
+                      onFocus={() => handleNotificationFocus('message')}
+                      onChange={(e) => handleNotificationChange('message', e.target.value)}
                       placeholder="ENTER FULL NOTIFICATION MESSAGE..."
-                      className="w-full p-4 bg-white border-2 border-black focus:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all outline-none font-medium min-h-[150px] resize-y placeholder:text-neutral-400"
+                      className={`w-full p-4 bg-white border-2 focus:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all outline-none font-medium min-h-[150px] resize-y placeholder:text-neutral-400 ${notificationErrors.message ? 'border-red-500' : 'border-black'}`}
                       required
                       maxLength={1000}
                     ></textarea>
+                    {notificationTouched.message && notificationErrors.message && (
+                      <p className="mt-1 text-[10px] font-black text-red-600 uppercase">{notificationErrors.message}</p>
+                    )}
+                    <p className="mt-1 text-[10px] font-bold text-neutral-400 text-right">{notificationForm.message.length}/1000</p>
                   </div>
                   <button
                     type="submit"

@@ -53,6 +53,9 @@ const EventDetailModal = ({
   certificateId,
   isAttended,
   disabledActions = false,
+  hideRegister = false,
+  hideHostCard = false,
+  hideSecondaryActions = false,
 }) => {
   const [loading, setLoading] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
@@ -524,7 +527,7 @@ Check it out here: ${window.location.href}`;
                       </div>
 
                       {/* Action Button */}
-                      <div className="space-y-4">
+                      {!hideRegister && <div className="space-y-4">
                         {registered ? (
                           <div className="bg-emerald-50 border-2 border-emerald-600 p-4 text-center">
                             <div className="flex justify-center mb-2">
@@ -669,7 +672,7 @@ Check it out here: ${window.location.href}`;
                             )}
                           </>
                         )}
-                      </div>
+                      </div>}
 
                       {(event.meetingLink || event.location) && registered && (
                         <div className="mt-4 pt-4 border-t-2 border-black">
@@ -696,7 +699,7 @@ Check it out here: ${window.location.href}`;
                     </div>
 
                     {/* Host Card */}
-                    <div className="bg-white border-2 border-black p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                    {!hideHostCard && <div className="bg-white border-2 border-black p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
                       <div className="flex items-center gap-3 mb-4">
                         {event.hostId?.profilePic ? (
                           <img
@@ -735,10 +738,10 @@ Check it out here: ${window.location.href}`;
                           Profile
                         </button>
                       </div>
-                    </div>
+                    </div>}
 
                     {/* Secondary Actions (Share & Bookmark) */}
-                    <div className="grid grid-cols-2 gap-4">
+                    {!hideSecondaryActions && <div className="grid grid-cols-2 gap-4">
                       <button
                         onClick={() => onBookmark(event)}
                         disabled={disabledActions}
@@ -811,7 +814,7 @@ Check it out here: ${window.location.href}`;
                           </a>
                         </div>
                       </div>
-                    </div>
+                    </div>}
                   </div>
                 </div>
               </div>
